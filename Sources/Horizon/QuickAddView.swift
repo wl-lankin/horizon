@@ -99,7 +99,23 @@ struct QuickAddView: View {
     private func preview(_ d: QuickAdd.Draft) -> String {
         let day = "\(Fmt.dayTitle(d.start, now: store.now)), \(Fmt.string(d.start, "d. MMM"))"
         let time = d.allDay ? "ganztägig" : "\(Fmt.time(d.start)) - \(Fmt.time(d.end))"
-        return "\(d.title) · \(day) · \(time)"
+        var parts = [d.title, day, time]
+        if let r = d.recurrence {
+            let label: String = switch r {
+            case .daily: "täglich"
+            case .weekly: "wöchentlich"
+            case .monthly: "monatlich"
+            case .yearly: "jährlich"
+            }
+            parts.append(label)
+        }
+        if let loc = d.location { parts.append("@\(loc)") }
+        if let target = store.calendar(matching: d.calendarHint) {
+            parts.append("→ \(target.title)")
+        } else if let hint = d.calendarHint {
+            parts.append("#\(hint) unbekannt")
+        }
+        return parts.joined(separator: " · ")
     }
 
     private func save() {

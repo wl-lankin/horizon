@@ -1,0 +1,74 @@
+# Builds Horizon (universal: Apple Silicon + Intel), signs it with the Horizon certificate, signs the
+# update zip and attaches DMG, zip and latest.json to a DRAFT GitHub release. Installed apps see the
+# update once the draft is published. Trigger: push a tag like v1.0.0 (see docs/RELEASE.md).
+#
+# The DMG is attached twice: with the version in the name and as Horizon-macOS.dmg, so the website can
+# always link to releases/latest/download/Horizon-macOS.dmg.
+# A manual run (workflow_dispatch) builds and uploads the files as an artifact only, no release.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.ref_name }}
+
+jobs:
+  macos:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - run: swift --version
+
+      - name: Tests
+        run: swift test
+
+      - name: Signing keychain
+        env:
+          P12: ${{ secrets.HORIZON_SIGNING_P12 }}
+          PASS: ${{ secrets.HORIZON_SIGNING_PASSWORD }}
+        run: |
+          KC="$RUNNER_TEMP/signing.keychain-db"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p "$PASS" "$KC"
+          security set-keychain-settings "$KC"
+          security unlock-keychain -p "$PASS" "$KC"
+          security import "$RUNNER_TEMP/signing.p12" -k "$KC" -P "$PASS" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$PASS" "$KC" > /dev/null
+          rm "$RUNNER_TEMP/signing.p12"
+          echo "SIGN_KEYCHAIN=$KC" >> "$GITHUB_ENV"
+
+      - name: Build
+        env:
+          SIGN_KEYCHAIN_PASSWORD: ${{ secrets.HORIZON_SIGNING_PASSWORD }}
+          HORIZON_UPDATE_KEY: ${{ secrets.HORIZON_UPDATE_KEY }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then VERSION="${TAG#v}"; VERSION="${VERSION%%-*}"; else VERSION=""; fi
+          ./build.sh release $VERSION
+          codesign -dv build/Horizon.app 2>&1 | grep Authority
+
+      - name: Draft release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .github/release-notes.sh "$TAG" > notes.md
+          flags=(--draft --title "Horizon $TAG" --notes-file notes.md)
+          [[ "$TAG" == *-* ]] && flags+=(--prerelease)
+          gh release create "$TAG" "${flags[@]}" dist/*
+
+      - name: Artifact (manual run)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: horizon
+          path: dist/

@@ -2,11 +2,16 @@ import Foundation
 
 /// Small German natural-language parser: "Fr 14 Uhr Zahnarzt", "morgen 9:30-11 Friseur", "23.10. Geburtstag".
 enum QuickAdd {
+    enum Recurrence: Equatable { case daily, weekly, monthly, yearly }
+
     struct Draft: Equatable {
         var title: String
         var start: Date
         var end: Date
         var allDay: Bool
+        var calendarHint: String? = nil
+        var location: String? = nil
+        var recurrence: Recurrence? = nil
     }
 
     private static let b = "(?<![\\p{L}\\d])"
@@ -34,8 +39,30 @@ enum QuickAdd {
             return groups
         }
 
+        let wd = "montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|mo|di|mi|do|fr|sa|so"
+        // Location and calendar are taken first so their contents are not read as dates or times.
+        let stop = "#|jede[nsm]?\\s|täglich|wöchentlich|monatlich|jährlich|um\\s|ab\\s|(?:heute|morgen|übermorgen|nächste[rn]?|kommende[rn]?)(?![\\p{L}\\d])|"
+            + "(?:am\\s+)?(?:" + wd + ")\\.?(?![\\p{L}\\d])|\\d{1,2}(?::\\d{2}|\\.\\d{2}(?!\\.)|\\s*uhr|\\s*-)"
+        let location = take("@(.+?)(?=\\s+(?:" + stop + ")|\\s*$)").map { $0[1].trimmingCharacters(in: .whitespaces) }
+        let calendarHint = take("#([\\p{L}\\d_-]+)")?[1]
+
         var day: Date?
         var weekdayTarget: Int?
+        var recurrence: Recurrence?
+
+        let nextWeek = take(b + "(?:nächste[rn]?|kommende[rn]?)\\s+woche" + e) != nil
+        if take(b + "(?:täglich|jeden\\s+tag)" + e) != nil {
+            recurrence = .daily
+        } else if take(b + "wöchentlich" + e) != nil {
+            recurrence = .weekly
+        } else if take(b + "(?:monatlich|jeden\\s+monat)" + e) != nil {
+            recurrence = .monthly
+        } else if take(b + "(?:jährlich|jedes\\s+jahr)" + e) != nil {
+            recurrence = .yearly
+        } else if let g = take(b + "jeden\\s+(" + wd + ")\\.?" + e) {
+            recurrence = .weekly
+            weekdayTarget = weekdays[g[1].lowercased()]
+        }
 
         if let g = take(b + "(?:am\\s+)?(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2,4})?" + e) {
             var comps = cal.dateComponents([.year], from: now)
@@ -53,7 +80,7 @@ enum QuickAdd {
             day = today
         } else if let g = take(b + "in\\s+(\\d{1,3})\\s+tag(?:en)?" + e) {
             day = cal.adding(days: Int(g[1]) ?? 0, to: today)
-        } else if let g = take(b + "(?:am\\s+|nächsten?\\s+)?(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|mo|di|mi|do|fr|sa|so)\\.?" + e) {
+        } else if let g = take(b + "(?:am\\s+|nächsten?\\s+)?(" + wd + ")\\.?" + e) {
             weekdayTarget = weekdays[g[1].lowercased()]
         }
 
@@ -78,7 +105,10 @@ enum QuickAdd {
             duration = (Double(g[1]) ?? 60) * 60
         }
 
-        if let target = weekdayTarget {
+        let nextMonday = cal.adding(days: 7 - (cal.component(.weekday, from: today) + 5) % 7, to: today)
+        if nextWeek && day == nil {
+            day = cal.adding(days: weekdayTarget.map { ($0 + 5) % 7 } ?? 0, to: nextMonday)
+        } else if let target = weekdayTarget {
             let current = cal.component(.weekday, from: today)
             var ahead = (target - current + 7) % 7
             if ahead == 0, let s = start, (s.h, s.m) <= (cal.component(.hour, from: now), cal.component(.minute, from: now)) {
@@ -99,14 +129,16 @@ enum QuickAdd {
 
         guard let s = start,
               let startDate = cal.date(bySettingHour: s.h, minute: s.m, second: 0, of: base) else {
-            return Draft(title: title, start: base, end: cal.adding(days: 1, to: base), allDay: true)
+            return Draft(title: title, start: base, end: cal.adding(days: 1, to: base), allDay: true,
+                         calendarHint: calendarHint, location: location, recurrence: recurrence)
         }
         var endDate = startDate.addingTimeInterval(duration)
         if let en = end, let candidate = cal.date(bySettingHour: min(en.h, 23), minute: min(en.m, 59), second: 0, of: base),
            candidate > startDate {
             endDate = candidate
         }
-        return Draft(title: title, start: startDate, end: endDate, allDay: false)
+        return Draft(title: title, start: startDate, end: endDate, allDay: false,
+                     calendarHint: calendarHint, location: location, recurrence: recurrence)
     }
 
     private static func cleanTitle(_ raw: String) -> String {

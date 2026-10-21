@@ -9,6 +9,8 @@ struct HorizonApp: App {
         if CommandLine.arguments.contains("--launch-at-login") {
             try? SMAppService.mainApp.register()
         }
+        Snapshot.runIfRequested()
+        Updater.shared.start()
     }
 
     var body: some Scene {

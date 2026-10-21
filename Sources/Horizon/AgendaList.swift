@@ -77,12 +77,17 @@ private struct AgendaRow: View {
     var body: some View {
         let now = store.now
         let ongoing = event.isOngoing(at: now) && !event.isAllDay
+        let overdue = event.isOverdue(at: now)
         let soon = event.start > now && event.start.timeIntervalSince(now) < 15 * 60
 
         HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(event.color.gradient)
-                .frame(width: 4, height: 30)
+            if event.isReminder {
+                ReminderCheck(color: event.color) { store.complete(event) }
+            } else {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(event.color.gradient)
+                    .frame(width: 4, height: 30)
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(event.title)
@@ -96,7 +101,14 @@ private struct AgendaRow: View {
 
             Spacer(minLength: 6)
 
-            if let url = event.meetingURL, ongoing || soon {
+            if overdue {
+                Text("überfällig")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(.red.opacity(0.14)))
+            } else if let url = event.meetingURL, ongoing || soon {
                 JoinButton(url: url, color: event.color)
             } else if ongoing {
                 Text("läuft")
@@ -124,13 +136,16 @@ private struct AgendaRow: View {
         )
         .contentShape(Rectangle())
         .onHover { hover = $0 }
-        .onTapGesture { store.open(event) }
-        .help("\(event.calendarTitle) · in „Kalender“ öffnen")
+        .onTapGesture { store.show(.detail(event)) }
+        .help("\(event.calendarTitle) · Details anzeigen")
     }
 
     private var subtitle: String {
         var parts: [String] = []
-        if event.isAllDay {
+        if event.isReminder {
+            let day = store.cal.isDate(event.start, inSameDayAs: day) ? "" : Fmt.string(event.start, "EE d. MMM") + " "
+            parts.append(event.isAllDay ? "Erinnerung" : "Erinnerung · \(day)\(Fmt.time(event.start))")
+        } else if event.isAllDay {
             parts.append("ganztägig")
         } else if !store.cal.isDate(event.start, inSameDayAs: event.end.addingTimeInterval(-1)) {
             parts.append("\(Fmt.string(event.start, "EE HH:mm")) - \(Fmt.string(event.end, "EE HH:mm"))")
@@ -141,5 +156,35 @@ private struct AgendaRow: View {
             parts.append(loc.components(separatedBy: .newlines).first ?? loc)
         }
         return parts.joined(separator: " · ")
+    }
+}
+
+private struct ReminderCheck: View {
+    let color: Color
+    let action: () -> Void
+    @State private var hover = false
+    @State private var done = false
+
+    var body: some View {
+        Button {
+            withAnimation(.snappy(duration: 0.2)) { done = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: action)
+        } label: {
+            ZStack {
+                Circle().strokeBorder(color, lineWidth: 1.5)
+                if done || hover {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 8, weight: .heavy))
+                        .foregroundStyle(done ? .white : color)
+                }
+            }
+            .background(Circle().fill(done ? color : .clear))
+            .frame(width: 16, height: 16)
+            .frame(width: 18, height: 30)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .help("Als erledigt markieren")
     }
 }

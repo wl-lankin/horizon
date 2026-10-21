@@ -47,7 +47,7 @@ struct NowBanner: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .contentShape(Rectangle())
-                .onTapGesture { store.open(e) }
+                .onTapGesture { store.show(.detail(e)) }
             }
         }
     }

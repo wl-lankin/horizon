@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PopoverView: View {
     @EnvironmentObject var store: CalendarStore
+    @FocusState private var keyFocus: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -10,6 +11,41 @@ struct PopoverView: View {
                 .padding(.top, 14)
                 .padding(.bottom, 12)
 
+            switch store.panel {
+            case .detail(let item):
+                Hairline()
+                DetailView(item: item)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            case .place:
+                Hairline()
+                PlacePanel()
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            case .none:
+                main
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+
+            Hairline()
+            FooterView()
+        }
+        .frame(width: 330)
+        .background(SkyBackground(phase: SkyPhase.at(store.now)))
+        .focusable()
+        .focusEffectDisabled()
+        .focused($keyFocus)
+        .onKeyPress(phases: .down, action: handleKey)
+        .onAppear {
+            store.tick()
+            keyFocus = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            if store.panel == .none { keyFocus = true }
+        }
+    }
+
+    @ViewBuilder
+    private var main: some View {
+        VStack(spacing: 0) {
             if store.access == .granted {
                 NowBanner()
                 Hairline()
@@ -31,18 +67,38 @@ struct PopoverView: View {
                 Hairline()
                 AccessView()
             }
-
-            Hairline()
-            FooterView()
         }
-        .frame(width: 330)
-        .background(SkyBackground(phase: SkyPhase.at(store.now)))
-        .onAppear { store.tick() }
+    }
+
+    private func handleKey(_ press: KeyPress) -> KeyPress.Result {
+        if store.panel != .none {
+            guard press.key == .escape else { return .ignored }
+            store.show(.none)
+            keyFocus = true
+            return .handled
+        }
+        let byMonth = press.modifiers.contains(.command) || press.modifiers.contains(.option)
+        switch press.key {
+        case .leftArrow: byMonth ? store.shiftSelectionMonth(-1) : store.shiftSelection(days: -1)
+        case .rightArrow: byMonth ? store.shiftSelectionMonth(1) : store.shiftSelection(days: 1)
+        case .upArrow: store.shiftSelection(days: -7)
+        case .downArrow: store.shiftSelection(days: 7)
+        case .pageUp: store.shiftSelectionMonth(-1)
+        case .pageDown: store.shiftSelectionMonth(1)
+        case .return:
+            guard let first = store.agendaSections().first?.items.first else { return .ignored }
+            store.show(.detail(first))
+        default:
+            guard press.modifiers.isEmpty, ["t", "h"].contains(press.characters.lowercased()) else { return .ignored }
+            store.goToToday()
+        }
+        return .handled
     }
 }
 
 struct HeaderView: View {
     @EnvironmentObject var store: CalendarStore
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         let now = store.now
@@ -62,7 +118,8 @@ struct HeaderView: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 Image(systemName: phase.symbol)
-                    .symbolRenderingMode(.multicolor)
+                    .symbolRenderingMode(phase == .night && scheme == .light ? .hierarchical : .multicolor)
+                    .foregroundStyle(phase == .night && scheme == .light ? Brand.night : .primary)
                     .font(.system(size: 22))
                     .padding(.bottom, 2)
                 Text(Fmt.string(now, "MMMM yyyy"))
@@ -112,6 +169,7 @@ struct AccessView: View {
 
 struct FooterView: View {
     @EnvironmentObject var store: CalendarStore
+    @ObservedObject private var updater = Updater.shared
     @State private var hover = false
 
     var body: some View {
@@ -126,6 +184,17 @@ struct FooterView: View {
             .buttonStyle(.plain)
             .onHover { hover = $0 }
             Spacer()
+            if case .ready(let version) = updater.state {
+                Button {
+                    updater.relaunch()
+                } label: {
+                    Label("\(version) bereit · Neu starten", systemImage: "arrow.down.circle.fill")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(Brand.gradient)
+                }
+                .buttonStyle(.plain)
+                .help("Horizon wurde aktualisiert und startet neu")
+            }
             SettingsMenu()
         }
         .padding(.horizontal, 16)
@@ -137,6 +206,18 @@ struct SettingsMenu: View {
     @EnvironmentObject var store: CalendarStore
     @AppStorage("barStyle") private var barStyle = BarStyle.next.rawValue
     @AppStorage("showWeeks") private var showWeeks = true
+    @State private var updateState: Updater.State = .idle
+
+    private var updateLabel: String {
+        switch updateState {
+        case .checking: "Suche nach Updates …"
+        case .upToDate: "Horizon ist aktuell (\(Updater.shared.currentVersion))"
+        case .downloading(let v): "Lade Version \(v) …"
+        case .ready(let v): "Version \(v) ist bereit"
+        case .failed(let m): "Update fehlgeschlagen: \(m)"
+        case .idle: "Nach Updates suchen …"
+        }
+    }
 
     var body: some View {
         Menu {
@@ -159,18 +240,26 @@ struct SettingsMenu: View {
                         }))
                 }
             }
+            Toggle("Erinnerungen anzeigen", isOn: $store.showReminders)
             Toggle("Kalenderwochen", isOn: $showWeeks)
+            Button("Ort für Sonnenzeiten: \(store.placeName) …") { store.show(.place) }
+            Divider()
+            Toggle("Kurzbefehl ⌥⌘K öffnet Horizon", isOn: $store.hotKeyEnabled)
             Toggle("Bei Anmeldung starten", isOn: Binding(
                 get: { store.launchAtLogin },
                 set: { store.launchAtLogin = $0 }))
             Divider()
-            Button("Horizon beenden") { NSApp.terminate(nil) }
+            Button(updateLabel) { Task { await Updater.shared.check(manual: true) } }
+                .disabled(!Updater.shared.isEnabled)
+            Divider()
+            Button("Horizon \(Updater.shared.currentVersion) beenden") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         } label: {
             Image(systemName: "slider.horizontal.3")
                 .font(.system(size: 13, weight: .medium))
         }
         .menuStyle(.borderlessButton)
+        .onReceive(Updater.shared.$state) { updateState = $0 }
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Einstellungen")

@@ -2,33 +2,39 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key>
-    <string>Horizon</string>
-    <key>CFBundleDisplayName</key>
-    <string>Horizon</string>
-    <key>CFBundleIdentifier</key>
-    <string>de.wolfganglinz.horizon</string>
-    <key>CFBundleExecutable</key>
-    <string>Horizon</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>de</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
-    <key>LSUIElement</key>
-    <true/>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-    <key>NSCalendarsFullAccessUsageDescription</key>
-    <string>Horizon zeigt deine Termine in der Menüleiste an und trägt neue Termine ein.</string>
-    <key>NSCalendarsUsageDescription</key>
-    <string>Horizon zeigt deine Termine in der Menüleiste an und trägt neue Termine ein.</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>de</string>
+	<key>CFBundleDisplayName</key>
+	<string>Horizon</string>
+	<key>CFBundleExecutable</key>
+	<string>Horizon</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>de.wolfganglinz.horizon</string>
+	<key>CFBundleName</key>
+	<string>Horizon</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>HorizonUpdatePublicKey</key>
+	<string>ksrSDN8v0hYSvyyp3RLxXVroh7UyQDqfCoJa0D3CYBI=</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Horizon zeigt deine Termine in der Menüleiste an und trägt neue Termine ein.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Horizon zeigt deine Termine in der Menüleiste an und trägt neue Termine ein.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Horizon zeigt fällige Erinnerungen neben deinen Terminen an und hakt sie auf Wunsch ab.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Horizon zeigt fällige Erinnerungen neben deinen Terminen an und hakt sie auf Wunsch ab.</string>
 </dict>
 </plist>

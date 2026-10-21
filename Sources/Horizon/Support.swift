@@ -78,6 +78,7 @@ extension Color {
 enum Brand {
     static let sun = Color(hex: 0xFFB347)
     static let ember = Color(hex: 0xFF6B6B)
+    static let night = Color(hex: 0x4F5BD5)
     static let gradient = LinearGradient(colors: [Color(hex: 0xFFA552), Color(hex: 0xFF5F7E)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing)
 }

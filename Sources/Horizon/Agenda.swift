@@ -1,7 +1,17 @@
 import SwiftUI
 import EventKit
+import CoreLocation
 
 struct Agenda: Identifiable, Hashable {
+    enum Kind: Hashable { case event, reminder }
+
+    struct Attendee: Hashable {
+        let name: String
+        let status: EKParticipantStatus
+        let isMe: Bool
+    }
+
+    let kind: Kind
     let id: String
     let eventID: String
     let title: String
@@ -11,30 +21,75 @@ struct Agenda: Identifiable, Hashable {
     let color: Color
     let calendarTitle: String
     let location: String?
+    let coordinate: CLLocationCoordinate2D?
     let meetingURL: URL?
+    let url: URL?
+    let notes: String?
+    let attendees: [Attendee]
+    let isRecurring: Bool
+
+    var isReminder: Bool { kind == .reminder }
 
     init(_ e: EKEvent) {
+        kind = .event
         eventID = e.eventIdentifier ?? UUID().uuidString
         id = "\(eventID)@\(e.startDate.timeIntervalSince1970)"
-        let t = e.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        title = t.isEmpty ? "Ohne Titel" : t
+        title = Self.clean(e.title) ?? "Ohne Titel"
         start = e.startDate
         end = e.endDate
         isAllDay = e.isAllDay
         color = Color(nsColor: e.calendar?.color ?? .systemBlue)
         calendarTitle = e.calendar?.title ?? ""
-        let loc = e.location?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        location = loc.isEmpty ? nil : loc
+        location = Self.clean(e.location)
+        coordinate = e.structuredLocation?.geoLocation?.coordinate
         meetingURL = MeetingLink.find(in: e)
+        url = e.url
+        notes = Self.clean(e.notes)
+        attendees = (e.attendees ?? []).map {
+            Attendee(name: $0.name ?? $0.url.absoluteString.replacingOccurrences(of: "mailto:", with: ""),
+                     status: $0.participantStatus, isMe: $0.isCurrentUser)
+        }
+        isRecurring = e.hasRecurrenceRules
     }
 
-    func isOngoing(at now: Date) -> Bool { start <= now && end > now }
+    init(reminder r: EKReminder, due: Date, hasTime: Bool, cal: Calendar = .de) {
+        kind = .reminder
+        eventID = r.calendarItemIdentifier
+        id = "r:\(eventID)"
+        title = Self.clean(r.title) ?? "Ohne Titel"
+        start = hasTime ? due : cal.startOfDay(for: due)
+        end = hasTime ? due : cal.adding(days: 1, to: cal.startOfDay(for: due))
+        isAllDay = !hasTime
+        color = Color(nsColor: r.calendar?.color ?? .systemOrange)
+        calendarTitle = r.calendar?.title ?? ""
+        location = Self.clean(r.location)
+        coordinate = nil
+        meetingURL = nil
+        url = r.url
+        notes = Self.clean(r.notes)
+        attendees = []
+        isRecurring = r.hasRecurrenceRules
+    }
+
+    func isOngoing(at now: Date) -> Bool { !isReminder && start <= now && end > now }
+
+    func isOverdue(at now: Date, cal: Calendar = .de) -> Bool {
+        isReminder && (isAllDay ? end <= cal.startOfDay(for: now) : start < now)
+    }
 
     func progress(at now: Date) -> Double {
         let total = end.timeIntervalSince(start)
         guard total > 0 else { return 0 }
         return min(1, max(0, now.timeIntervalSince(start) / total))
     }
+
+    private static func clean(_ s: String?) -> String? {
+        let t = s?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return t.isEmpty ? nil : t
+    }
+
+    static func == (a: Agenda, b: Agenda) -> Bool { a.id == b.id && a.start == b.start && a.title == b.title }
+    func hash(into h: inout Hasher) { h.combine(id) }
 }
 
 struct AgendaSection: Identifiable {

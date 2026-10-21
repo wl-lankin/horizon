@@ -2,9 +2,17 @@ import SwiftUI
 
 /// Sunrise/sunset via the NOAA approximation, good to about a minute.
 enum Sun {
-    // Kochel am See. Kept fixed on purpose so the app never needs location access.
-    static let latitude = 47.66
-    static let longitude = 11.37
+    // A chosen place instead of CoreLocation, so the app never needs location access.
+    static var latitude: Double { UserDefaults.standard.object(forKey: "sunLatitude") as? Double ?? 47.66 }
+    static var longitude: Double { UserDefaults.standard.object(forKey: "sunLongitude") as? Double ?? 11.37 }
+    static var placeName: String { UserDefaults.standard.string(forKey: "sunPlace") ?? "Kochel am See" }
+
+    static func setPlace(name: String, latitude: Double, longitude: Double) {
+        let d = UserDefaults.standard
+        d.set(name, forKey: "sunPlace")
+        d.set(latitude, forKey: "sunLatitude")
+        d.set(longitude, forKey: "sunLongitude")
+    }
 
     struct Times { let rise: Date; let set: Date }
 

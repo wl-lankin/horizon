@@ -5,6 +5,7 @@ let package = Package(
     name: "Horizon",
     platforms: [.macOS(.v14)],
     targets: [
-        .executableTarget(name: "Horizon", path: "Sources/Horizon")
+        .executableTarget(name: "Horizon", path: "Sources/Horizon"),
+        .testTarget(name: "HorizonTests", dependencies: ["Horizon"], path: "Tests/HorizonTests")
     ]
 )

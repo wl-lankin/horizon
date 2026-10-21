@@ -3,6 +3,7 @@ import SwiftUI
 /// The selected day as a horizon: the sun's path above, the day's events laid out below it.
 struct DayArcView: View {
     @EnvironmentObject var store: CalendarStore
+    @Environment(\.colorScheme) private var scheme
 
     private let arcHeight: CGFloat = 30
     private let laneHeight: CGFloat = 18
@@ -41,6 +42,8 @@ struct DayArcView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
+                    .help("Sonnenauf- und -untergang in \(store.placeName)")
+                    .onTapGesture { store.show(.place) }
                 }
             }
 
@@ -54,7 +57,7 @@ struct DayArcView: View {
                             .padding(.vertical, 3)
                             .background(Capsule().fill(e.color.opacity(0.25)))
                             .overlay(Capsule().strokeBorder(e.color.opacity(0.5), lineWidth: 0.5))
-                            .onTapGesture { store.open(e) }
+                            .onTapGesture { store.show(.detail(e)) }
                     }
                     if allDay.count > 3 {
                         Text("+\(allDay.count - 3)")
@@ -109,12 +112,18 @@ struct DayArcView: View {
                         EventCapsule(event: e, width: width, height: laneHeight - 3)
                             .opacity(past ? 0.4 : 1)
                             .offset(x: x0, y: lanesTop + CGFloat(lanes[e.id] ?? 0) * laneHeight)
-                            .onTapGesture { store.open(e) }
+                            .onTapGesture { store.show(.detail(e)) }
+                    }
+
+                    ForEach(store.reminders(on: day).filter { !$0.isAllDay }) { r in
+                        ReminderMark(reminder: r)
+                            .offset(x: x(r.start) - 5, y: baseline - 5)
+                            .onTapGesture { store.show(.detail(r)) }
                     }
 
                     ForEach(hourMarks(span), id: \.self) { mark in
                         let px = x(mark)
-                        Text(Fmt.string(mark, "HH"))
+                        Text(store.cal.isDate(mark, inSameDayAs: day) ? Fmt.string(mark, "HH") : "24")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(.tertiary)
                             .monospacedDigit()
@@ -158,8 +167,8 @@ struct DayArcView: View {
         } else {
             Image(systemName: "moon.fill")
                 .font(.system(size: 10))
-                .foregroundStyle(Color(hex: 0xC9D3FF))
-                .shadow(color: Color(hex: 0x9FB0FF).opacity(0.8), radius: 4)
+                .foregroundStyle(scheme == .light ? Brand.night : Color(hex: 0xC9D3FF))
+                .shadow(color: Color(hex: 0x9FB0FF).opacity(scheme == .light ? 0.4 : 0.8), radius: 4)
                 .offset(x: x - 5, y: baseline - 15)
         }
     }
@@ -279,5 +288,23 @@ struct CompactLabel: LabelStyle {
             configuration.icon.symbolRenderingMode(.multicolor)
             configuration.title
         }
+    }
+}
+
+private struct ReminderMark: View {
+    let reminder: Agenda
+    @State private var hover = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2, style: .continuous)
+            .fill(reminder.color)
+            .overlay(RoundedRectangle(cornerRadius: 2, style: .continuous).strokeBorder(.white.opacity(0.8), lineWidth: 1))
+            .frame(width: 8, height: 8)
+            .rotationEffect(.degrees(45))
+            .scaleEffect(hover ? 1.3 : 1)
+            .frame(width: 10, height: 10)
+            .animation(.snappy(duration: 0.15), value: hover)
+            .onHover { hover = $0 }
+            .help("Erinnerung: \(reminder.title)\n\(Fmt.time(reminder.start))")
     }
 }

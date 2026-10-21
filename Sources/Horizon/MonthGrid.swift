@@ -3,6 +3,9 @@ import SwiftUI
 struct MonthGrid: View {
     @EnvironmentObject var store: CalendarStore
     @AppStorage("showWeeks") private var showWeeks = true
+    @State private var gridFrame: CGRect = .zero
+    @State private var scrollMonitor: Any?
+    @State private var scrollAccumulator: CGFloat = 0
 
     private let weekColumn: CGFloat = 26
 
@@ -39,6 +42,35 @@ struct MonthGrid: View {
                     .transition(.push(from: store.monthDirection))
             }
             .clipped()
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { gridFrame = $0 }
+        }
+        .onAppear(perform: installScrollMonitor)
+        .onDisappear {
+            if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
+            scrollMonitor = nil
+        }
+    }
+
+    /// Scrolling over the grid flips months. A local monitor avoids an NSView overlay that would eat the clicks.
+    private func installScrollMonitor() {
+        guard scrollMonitor == nil else { return }
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
+            guard let content = event.window?.contentView else { return event }
+            let p = event.locationInWindow
+            let point = CGPoint(x: p.x, y: content.bounds.height - p.y)
+            guard gridFrame.contains(point) else { return event }
+            if event.momentumPhase != [] { return nil }
+            if !event.hasPreciseScrollingDeltas {
+                if event.scrollingDeltaY != 0 { store.shiftMonth(event.scrollingDeltaY < 0 ? 1 : -1) }
+                return nil
+            }
+            if event.phase == .began { scrollAccumulator = 0 }
+            scrollAccumulator += event.scrollingDeltaY
+            if abs(scrollAccumulator) > 40 {
+                store.shiftMonth(scrollAccumulator < 0 ? 1 : -1)
+                scrollAccumulator = 0
+            }
+            return nil
         }
     }
 
