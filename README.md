@@ -6,6 +6,8 @@ Horizon zeigt den Tag als Horizont: oben die Sonnenbahn mit echten Auf- und Unte
 
 **Download:** https://github.com/wl-lankin/horizon/releases/latest/download/Horizon-macOS.dmg (macOS 14 oder neuer, Apple Silicon und Intel)
 
+Kostenlos und Open Source unter der [MIT-Lizenz](LICENSE).
+
 ## Funktionen
 
 - **Menüleiste**: Kästchen mit dem Tag (Zahl ausgestanzt, färbt sich wie Systemsymbole). Wahlweise nur Symbol, mit Datum oder mit nächstem Termin („Elterngespräch in 25 Min.“).
@@ -75,7 +77,6 @@ open -n -W /Applications/Horizon.app --args --snapshot /tmp/shots main     # ode
 ## Wo es weitergeht
 
 1. **Notarisierung** mit einem Developer-ID-Zertifikat, damit die Warnung beim ersten Öffnen entfällt.
-2. **Produktseite** auf wolfgang-linz.de/horizon mit dem festen Download-Link.
-3. **Tests für den Store**: Gruppierung nach Tagen, mehrtägige Termine, Tageswechsel um Mitternacht.
-4. **Kurzbefehl frei wählbar** statt fest ⌥⌘K.
-5. **Mehrere Orte für Sonnenzeiten** oder Ort automatisch aus dem nächsten Termin.
+2. **Tests für den Store**: Gruppierung nach Tagen, mehrtägige Termine, Tageswechsel um Mitternacht.
+3. **Kurzbefehl frei wählbar** statt fest ⌥⌘K.
+4. **Mehrere Orte für Sonnenzeiten** oder Ort automatisch aus dem nächsten Termin.
