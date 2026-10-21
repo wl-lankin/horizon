@@ -56,7 +56,8 @@ jobs:
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then VERSION="${TAG#v}"; VERSION="${VERSION%%-*}"; else VERSION=""; fi
           ./build.sh release $VERSION
-          codesign -dv build/Horizon.app 2>&1 | grep Authority
+          # Installed apps only accept updates signed with this certificate (see docs/RELEASE.md).
+          codesign -d -r- build/Horizon.app 2>&1 | grep -q 'certificate root = H"96d253e52b10ec1f09f555bb3a374658b94de52a"'
 
       - name: Draft release
         if: startsWith(github.ref, 'refs/tags/')
